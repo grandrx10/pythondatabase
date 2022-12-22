@@ -51,6 +51,7 @@ def handle_client(conn, addr) -> None:
 
             # Disconnect the user when the disconnect message is recieved
             if msg["function_to_run"] == DISCONNECT_MESSAGE:
+                database.log_out(msg["parameter"])
                 connected = False
             else:
                 # put the return msg into the proper format
@@ -75,8 +76,6 @@ def start() -> None:
         thread = threading.Thread(target=handle_client, args=(conn, addr))
         # run handle_client() in a separate thread with arguments conn, addr
         thread.start()
-        print(f"[Active Connections] {threading.active_count() - 1}")
-        # print out how many active threads are running
 
 
 def send(function_to_run: str, parameter: Any, conn) -> None:
@@ -104,7 +103,8 @@ def send(function_to_run: str, parameter: Any, conn) -> None:
 database = Database()
 # This dictionary is a mapping of strings to their function counterparts
 str_to_function = {
-    "create_account": database.create_account
+    "create_account": database.create_account,
+    "log_in": database.log_in
 }
 
 print("server is starting")

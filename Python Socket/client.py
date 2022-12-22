@@ -3,8 +3,11 @@ This is the client for the python socket
 """
 import socket
 import pickle  # Use this to send objects and such
-from universal_modules.user_classes.Account import Account
 from typing import Any
+
+# import classes the client needs
+from universal_modules.user_classes.Account import Account
+from universal_modules.user_classes.ClientDisplay import ClientDisplay
 
 
 HEADER = 64
@@ -39,7 +42,7 @@ def send(function_to_run: str, parameter: Any) -> None:
         msg_length = int(msg_length)
         # find the length of the next message
         msg = pickle.loads(client.recv(msg_length))
-        print(msg)  # Replace this with some form of protocol
+        str_to_function[msg["function_to_run"]](msg["parameter"])
     # This is a blocking piece of code (Maybe run an update once every few milliseconds?)
 
 
@@ -47,16 +50,30 @@ def start() -> None:
     """
     The main loop of the client
     """
-    account = Account()
-    print("Create a new account or log in?")
-    user_input = input()
+    # This loop will run until the user is logged in.
+    while not account.get_logged_in():
+        print("Create a new account or log in?")
+        user_input = input()
 
-    if user_input == "create":
-        account.create_new_account()
-        send("create_account", account)
+        if user_input == "create":
+            account.create_new_account()
+            send("create_account", account)
+        elif user_input == "log in":
+            account.log_in()
+            send("log_in", account)
 
-    # send(input())
-    send(DISCONNECT_MESSAGE, None)  # Disconnect when finished
+    send(DISCONNECT_MESSAGE, account)  # Disconnect when finished
 
+
+# create the account the client is using
+account = Account()
+# create the client display, which will control what the client can see
+client_display = ClientDisplay(account)
+
+# This dictionary is a mapping of strings to their function counterparts
+str_to_function = {
+    "notify_status_of_log_in": client_display.notify_status_of_log_in,
+    "notify_status_of_account_creation": client_display.notify_status_of_account_creation
+}
 
 start()

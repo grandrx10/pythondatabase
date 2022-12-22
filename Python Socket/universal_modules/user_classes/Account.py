@@ -22,11 +22,26 @@ class Account:
         print("Password: ")
         self._password = input()
 
-    def to_msg(self) -> dict[str, str]:
+    def log_in(self):
         """
-        Gives a dictionary representation of this class
+        Enter a username and password to log into the account
         """
-        return {"username": self._username, "password": self._password}
+        print("Username: ")
+        self._username = input()
+        print("Password: ")
+        self._password = input()
+
+    def set_logged_in(self, status: bool) -> None:
+        """
+        Set logged in status
+        """
+        self._logged_in = status
+
+    def get_logged_in(self) -> bool:
+        """
+        :return: whether the account is logged in or not
+        """
+        return self._logged_in
 
     def get_username(self) -> str:
         """

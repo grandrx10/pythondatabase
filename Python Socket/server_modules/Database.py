@@ -16,24 +16,81 @@ class Database:
                 "mongodb+srv://RickShaltz:richardisawesome@cluster0.qggnuii.mongodb.net/?retryWrites=true&w=majority")
         self.db = self.cluster["PythonDatabase"]  # add the name of the cluster that was created
         self.user_info = self.db["UserInfo"]  # add the name of the collection under the cluster
+        self.online_users = {}
 
-    def create_account(self, account: Any) -> (str, bool):
+    def create_account(self, account: Any) -> dict[str, any]:
         """
         With a given username and password, attempt to create a user with that information.
+
+        Possible Returns:
+        False -> duplicate_username, password_length_invalid, username_length_invalid
+        True -> None
         """
         username = account.get_username()
         password = account.get_password()
 
         same_username_count = self.user_info.count_documents({"_id": username})
-        if same_username_count > 0:
-            return {"function_to_run": "notify_status_of_account", "parameter": (False, "duplicate_username")}
+        if len(username) <= 0:
+            return {"function_to_run": "notify_status_of_account_creation",
+                    "parameter": (False, "username_length_invalid")}
 
-        if len(password) < 3:
-            return {"function_to_run": "notify_status_of_account", "parameter": (False, "password_length_invalid")}
+        elif same_username_count > 0:
+            return {"function_to_run": "notify_status_of_account_creation", "parameter": (False, "duplicate_username")}
+
+        elif len(password) < 3:
+            return {"function_to_run": "notify_status_of_account_creation",
+                    "parameter": (False, "password_length_invalid")}
 
         post = {"_id": username, "password": password}
         self.user_info.insert_one(document=post)
-        return {"function_to_run": "notify_status_of_account", "parameter": (True, None)}
+        return {"function_to_run": "notify_status_of_account_creation", "parameter": (True, None)}
+
+    def log_in(self, account: Any) -> (str, bool):
+        """
+        Attempt to log in a user
+
+        Possible returns:
+        False -> invalid username, invalid password, already_logged_in
+        True -> None
+        """
+        username = account.get_username()
+        password = account.get_password()
+
+        # Check if the username is correct
+        username_found = self.user_info.count_documents({"_id": username})
+        if username_found == 0:
+            return {"function_to_run": "notify_status_of_log_in", "parameter": (False, "invalid_username")}
+
+        # Check if the password and username is correct
+        password_found = self.user_info.count_documents({"_id": username, "password": password})
+        if password_found == 0:
+            return {"function_to_run": "notify_status_of_log_in", "parameter": (False, "invalid_password")}
+
+        if account.get_username() in self.online_users:
+            return {"function_to_run": "notify_status_of_log_in", "parameter": (False, "already_logged_in")}
+
+        # add the user to the pool of online users.
+        self.online_users[account.get_username()] = account
+        # debugging number of online users
+        print(f"[Online Users] {self.get_number_of_online_users()}")
+
+        # debugging online users
+        for username in self.online_users:
+            print(username)
+
+        return {"function_to_run": "notify_status_of_log_in", "parameter": (True, None)}
+
+    def log_out(self, account: Any) -> None:
+        """
+        Log out an account that has closed the application
+        """
+        username = account.get_username()
+        if username in self.online_users:
+            self.online_users.pop(username)
+
+    def get_number_of_online_users(self):
+        """Return the number of users online"""
+        return len(self.online_users)
 
 
 """
