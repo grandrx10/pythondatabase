@@ -1,12 +1,14 @@
 """
 Program By Richard Yang
 """
-# https://stackoverflow.com/questions/12362542/python-server-only-one-usage-of-each-socket-address-is-normally-permitted
 import socket
 import threading  # allows for multiple threads to be used (does not require other clients to wait)
 import pickle
-from Database import Database
-from public.client_modules.Account.Account import Account
+from typing import Any
+
+# Import Classes
+from server_modules.Database import Database
+from universal_modules.user_classes.Account import Account  # Import this or pickle will not understand
 
 HEADER = 64
 # The first message to the server is going to be a header of length 64 informing the server
@@ -28,9 +30,10 @@ server.bind(ADDR)
 # we are binding our socket to our address
 
 
-def handle_client(conn, addr, database) -> None:
+def handle_client(conn, addr) -> None:
     """
-    Handle a client's connection and communications
+    Handle a client's connection and communications. Contains the main loop for the handling
+    of the client's connection.
     """
     print(f"New Connection {addr} connected.")
 
@@ -44,15 +47,16 @@ def handle_client(conn, addr, database) -> None:
             msg_length = int(msg_length)
             # find the length of the next message
             msg = pickle.loads(conn.recv(msg_length))
-            print(msg)
             # store the message
 
-            # if the disconnect message is recieved
-            if msg == DISCONNECT_MESSAGE:
+            # Disconnect the user when the disconnect message is recieved
+            if msg["function_to_run"] == DISCONNECT_MESSAGE:
                 connected = False
-
-            print(f"[{addr}] {msg}")
-            conn.send("Msg recieved".encode(FORMAT))
+            else:
+                # put the return msg into the proper format
+                return_msg = str_to_function[msg["function_to_run"]](msg["parameter"])
+                # Send the return message to the client
+                send(function_to_run=return_msg["function_to_run"], parameter=return_msg["parameter"], conn=conn)
 
     conn.close()  # close the connection when the client leaves
 
@@ -64,19 +68,44 @@ def start() -> None:
     server.listen()
     print(f"Server is listening on {server}")
 
-    # Create the database connection here
-    database = Database()
-
     while True:
         conn, addr = server.accept()
         # this waits for a new connection to the server
         # when a connection occurs, we will store the connection and address
-        thread = threading.Thread(target=handle_client, args=(conn, addr, database))
+        thread = threading.Thread(target=handle_client, args=(conn, addr))
         # run handle_client() in a separate thread with arguments conn, addr
         thread.start()
         print(f"[Active Connections] {threading.active_count() - 1}")
         # print out how many active threads are running
 
+
+def send(function_to_run: str, parameter: Any, conn) -> None:
+    """
+    Send a message to a specific client
+    """
+    # Construct the message that we will send
+    msg = {"function_to_run": function_to_run, "parameter": parameter}
+    # Encode the message into bytes
+    message = pickle.dumps(msg)
+    # Find the length of the message we are sending
+    msg_length = len(message)
+    # Encode the length of the message
+    send_length = str(msg_length).encode(FORMAT)
+    # Pad the length of the message until it is of the proper length HEADER
+    send_length += b' ' * (
+            HEADER - len(send_length))  # b' ' is byte representation of blank (This is for padding)
+    # Send the length of the message
+    conn.send(send_length)
+    # Send the message itself
+    conn.send(message)
+
+
+# Create the database connection here
+database = Database()
+# This dictionary is a mapping of strings to their function counterparts
+str_to_function = {
+    "create_account": database.create_account
+}
 
 print("server is starting")
 start()
